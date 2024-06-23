@@ -1,6 +1,7 @@
 """Base class for all file type converters.
 """
 
+import functools
 from abc import ABC, abstractmethod
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -8,9 +9,42 @@ from shutil import copy2
 from threading import Lock
 from typing import Dict, List, Union
 
-from rag.file_conversion_router.utils.logger import conversion_logger, logger
+from rag.file_conversion_router.utils.logger import get_logger
 from rag.file_conversion_router.utils.markdown_parser import MarkdownParser
 from rag.file_conversion_router.utils.utils import calculate_hash, ensure_path
+from rag.file_conversion_router.utils.time_measure import Timer
+
+
+base_convert_logger = get_logger(__name__)
+
+
+def conversion_logger(logger):
+    """Decorator to log the beginning and end of conversions, including timing.
+
+    Example Output:
+    ```
+    2021-09-30 15:00:00,000 - INFO - Starting _to_markdown for path/to/file.txt on CPU
+    2021-09-30 15:00:10,000 - INFO - [10.00 seconds] Successfully executed _to_markdown for path/to/file.txt to path/to/file.md
+    ```
+    """
+
+    def decorator(method):
+        @functools.wraps(method)
+        def wrapper(self, input_path: Path, output_path: Path, *args, **kwargs):
+            logger.info(f"Starting {method.__name__} for {input_path}")
+
+            with Timer() as timer:
+                result = method(self, input_path, output_path, *args, **kwargs)
+
+            logger.info(
+                f"[{timer.interval:.2f} seconds] Successfully executed {method.__name__} "
+                f"for {input_path} to {output_path}"
+            )
+            return result, timer.interval
+
+        return wrapper
+
+    return decorator
 
 
 class BaseConverter(ABC):
@@ -35,9 +69,9 @@ class BaseConverter(ABC):
         self._tree_txt_path = None
         self._pkl_path = None
 
-        self._logger = logger
+        self._logger = base_convert_logger
 
-    @conversion_logger
+    @conversion_logger(base_convert_logger)
     def convert(self, input_path: Union[str, Path], output_folder: Union[str, Path]) -> None:
         """Convert an input file to 3 files: Markdown, tree txt, and pkl file, under the output folder.
 
@@ -86,12 +120,12 @@ class BaseConverter(ABC):
         )
         self._use_cached_files(cached_paths, output_folder)
 
-    @conversion_logger
+    @conversion_logger(base_convert_logger)
     def _convert_to_markdown(self, input_path: Path, output_path: Path) -> None:
         """Convert the input file to Expected Markdown format."""
         self._to_markdown(input_path, output_path)
 
-    @conversion_logger
+    @conversion_logger(base_convert_logger)
     def _convert_md_to_tree_txt_and_pkl(self, input_path: Path, output_folder: Path) -> None:
         """Convert the input Markdown file to a tree txt file and a pkl file.
 
@@ -129,7 +163,7 @@ class BaseConverter(ABC):
             des_path.rename(output_folder / f"{correct_file_name}{suffix}")
             self._logger.info(f"Copied cached file from {path} to {des_path}.")
 
-    @conversion_logger
+    @conversion_logger(base_convert_logger)
     def _perform_conversion(self, input_path: Path, output_folder: Path) -> None:
         """Perform the file conversion process."""
         self._convert_to_markdown(input_path, self._md_path)

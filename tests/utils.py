@@ -7,18 +7,14 @@ import logging
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import List, Union
+from colorama import Fore, Style
 
-from colorama import Fore, Style, init
+from rag.file_conversion_router.utils.logger import get_logger
 
-# Initialize colorama
-init(autoreset=True)
-# Below code uses multiple times of `Style.RESET_ALL` due to some unsolved issue
-# but at lease the color now works as expected
-logging.basicConfig(
-    level=logging.DEBUG,
-    format=f"{Fore.WHITE}%(asctime)s - %(levelname)s - %(message)s{Style.RESET_ALL}",
-)
 
+test_logger = get_logger(__name__, console_level=logging.DEBUG)
+
+# Similarity threshold for comparing files
 SIMILARITY_THRESHOLD = 90
 
 
@@ -67,12 +63,12 @@ def format_diff_line(line: str) -> str:
 def format_and_print_diff(differences: List[str], fromfile: str, tofile: str) -> None:
     """Formats and prints differences between two files, specifying the file names."""
     if not differences:
-        logging.info(Fore.GREEN + f"No differences found between {fromfile} and {tofile}." + Style.RESET_ALL)
+        test_logger.info(Fore.GREEN + f"No differences found between {fromfile} and {tofile}." + Style.RESET_ALL)
     else:
-        logging.info(Fore.RED + f"Differences found between {fromfile} and {tofile}:\n" + Style.RESET_ALL)
+        test_logger.info(Fore.RED + f"Differences found between {fromfile} and {tofile}:\n" + Style.RESET_ALL)
         for line in differences:
             formatted_line = format_diff_line(line)
-            logging.info(formatted_line + Style.RESET_ALL)
+            test_logger.info(formatted_line + Style.RESET_ALL)
 
 
 def compare_files(expected_path: Path, output_path: Path, similarity_threshold: int = SIMILARITY_THRESHOLD) -> bool:
@@ -105,11 +101,11 @@ def compare_files(expected_path: Path, output_path: Path, similarity_threshold: 
     similarity_percentage = matcher.ratio() * 100
 
     if similarity_percentage >= similarity_threshold:
-        logging.info(Fore.GREEN + f"Files {fromfile} and {tofile} are similar "
+        test_logger.info(Fore.GREEN + f"Files {fromfile} and {tofile} are similar "
                                   f"above the threshold ({similarity_percentage:.2f}% similar)." + Style.RESET_ALL)
         return True
     else:
-        logging.info(Fore.RED + f"Files {fromfile} and {tofile} are not similar "
+        test_logger.info(Fore.RED + f"Files {fromfile} and {tofile} are not similar "
                                 f"({similarity_percentage:.2f}% similar)." + Style.RESET_ALL)
         if binary:
             diffs = get_diffs(hex_expected, hex_output, fromfile, tofile)
@@ -148,16 +144,16 @@ def compare_folders(expected_dir: Path, output_dir: Path, similarity_threshold: 
     # Report extra and missing files
     extra_files = output_files - expected_files
     if extra_files:
-        logging.info(Fore.RED + "Extra files in output directory:" + Style.RESET_ALL)
+        test_logger.info(Fore.RED + "Extra files in output directory:" + Style.RESET_ALL)
         for file in extra_files:
-            logging.info(Fore.RED + str(output_dir / file) + Style.RESET_ALL)
+            test_logger.info(Fore.RED + str(output_dir / file) + Style.RESET_ALL)
         all_matched = False
 
     missing_files = expected_files - output_files
     if missing_files:
-        logging.info(Fore.YELLOW + "Missing files in expected directory:" + Style.RESET_ALL)
+        test_logger.info(Fore.YELLOW + "Missing files in expected directory:" + Style.RESET_ALL)
         for file in missing_files:
-            logging.info(Fore.YELLOW + str(expected_dir / file) + Style.RESET_ALL)
+            test_logger.info(Fore.YELLOW + str(expected_dir / file) + Style.RESET_ALL)
         all_matched = False
 
     return all_matched
