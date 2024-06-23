@@ -1,9 +1,8 @@
-import logging
-
 import requests
 import subprocess
 import atexit
 import socket
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -19,34 +18,25 @@ class NougatAPIClient:
     def __init__(self, api_url: str = "http://127.0.0.1:8503"):
         self.api_url = api_url
 
-    def convert_pdf(self, pdf_file: Path, start: Optional[int] = None,
-                    stop: Optional[int] = None) -> str:
+    def convert_pdf(self, pdf_file: Path, start: Optional[int] = None, stop: Optional[int] = None) -> str:
         url = f"{self.api_url}/predict/"
-        params = []
+        params = {}
         if start is not None:
-            params.append(f"start={start}")
+            params["start"] = start
         if stop is not None:
-            params.append(f"stop={stop}")
+            params["stop"] = stop
 
-        url_with_params = url + "?" + "&".join(params) if params else url
-        curl_command = [
-            "curl",
-            "-X",
-            "POST",
-            url_with_params,
-            "-H",
-            "accept: application/json",
-            "-H",
-            "Content-Type: multipart/form-data", "-F",
-            f"file=@{pdf_file};type=application/pdf"
-        ]
+        with pdf_file.open(mode="rb") as file:
+            files = {"file": (pdf_file.name, file, "application/pdf")}
+            headers = {"accept": "application/json"}
 
-        pdf_converter_logger.debug(f"Sending PDF to Nougat API: {pdf_file}")
-        try:
-            result = subprocess.run(curl_command, check=True, capture_output=True, text=True)
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Error converting PDF: {e.returncode} - {e.stderr}")
+            pdf_converter_logger.debug(f"Sending PDF to Nougat API: {pdf_file}")
+            try:
+                response = requests.post(url, params=params, files=files, headers=headers)
+                response.raise_for_status()
+                return response.text
+            except requests.exceptions.RequestException as e:
+                raise Exception(f"Error converting PDF: {e}") from e
 
 
 class NougatServer:
@@ -82,6 +72,7 @@ class NougatServer:
                 pdf_converter_logger.info(f"Starting Nougat server on port {self.port}")
                 command = [
                     "nougat_api",
+                    "--no-skipping",
                     "--model",
                     self.model_tag,
                     "--batchsize",
@@ -108,11 +99,28 @@ class PdfConverter(BaseConverter):
     def __init__(self):
         super().__init__()
         self.nougat_server.start_server()
+        self._wait_for_server_ready()
+
+    def _wait_for_server_ready(self, timeout: int = 60, retry_interval: int = 1):
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                # Send a request to the API endpoint
+                response = requests.get(f"{self.nougat_api_client.api_url}/predict/")
+                if response.status_code == 405:  # Method Not Allowed
+                    pdf_converter_logger.info("Nougat server is ready")
+                    return
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(retry_interval)
+        raise TimeoutError("Timed out waiting for Nougat server to be ready")
 
     def _to_markdown(self, input_path: Path, output_path: Path) -> None:
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             markdown_text = self.nougat_api_client.convert_pdf(input_path)
+            # Remove the outer quotes and replace escaped newline characters with actual newlines
+            markdown_text = markdown_text.strip('"').replace('\\n', '\n')
             with open(output_path, "w") as file:
                 file.write(markdown_text)
         except Exception as e:
