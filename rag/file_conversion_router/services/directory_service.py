@@ -3,7 +3,8 @@ import logging
 from concurrent.futures import as_completed, Future
 from pathlib import Path
 from typing import Dict, Iterable, List, Literal, Optional, Type, Union
-from itertools import islice
+from itertools import islice, tee
+from tqdm import tqdm
 
 from rag.file_conversion_router.conversion.base_converter import BaseConverter, ConversionCache
 from rag.file_conversion_router.conversion.md_converter import MarkdownConverter
@@ -29,19 +30,24 @@ def process_folder(input_dir: Union[str, Path], output_dir: Union[str, Path], ba
     _validate_directory(input_dir, "input")
     _ensure_output_directory(output_dir)
 
-    for batch_number, batch in enumerate(_batch_process_files(input_dir, batch_size), start=1):
-        futures = list(filter(None, (_schedule_conversion_task(file_path, input_dir, output_dir) for file_path in batch)))
-        for future in as_completed(futures):
-            _handle_conversion_result(future)
-        logging.debug(f"Completed batch {batch_number} ({len(batch)} files)")
+    valid_files, valid_files_count = tee(_get_valid_files(input_dir))
+    total_files = sum(1 for _ in valid_files_count)
+
+    with tqdm(total=total_files, desc="Processing files", unit="file") as pbar:
+        for count, batch in enumerate(_batch_process_files(valid_files, batch_size), start=1):
+            logging.debug(f"Processing batch {count} of {len(batch)} files.")
+            futures = list(filter(None, (_schedule_conversion_task(file_path, input_dir, output_dir)
+                                         for file_path in batch)))
+            for future in as_completed(futures):
+                _handle_conversion_result(future, pbar)
+            logging.debug(f"Completed batch {count} of {len(batch)} files.")
 
     logging.info(f"Completed processing for directory: {input_dir}")
     logging.info(f"Saved conversion time [{ConversionCache.calc_total_savings()} seconds] by using cached results.")
 
 
-def _batch_process_files(input_dir: Path, batch_size: int) -> Iterable[List[Path]]:
+def _batch_process_files(valid_files: Iterable[Path], batch_size: int) -> Iterable[List[Path]]:
     """Yield batches of valid files for processing."""
-    valid_files = _get_valid_files(input_dir)
     while True:
         batch = list(islice(valid_files, batch_size))
         if not batch:
@@ -91,11 +97,13 @@ def _get_output_file_path(input_file_path: Path, input_dir: Path, output_dir: Pa
     return output_subdir / input_file_path.stem
 
 
-def _handle_conversion_result(future: Future) -> None:
-    """Handle the result of a conversion task."""
+def _handle_conversion_result(future: Future, pbar: tqdm) -> None:
+    """Handle the result of a conversion task and update the progress bar."""
     try:
         result = future.result()
         logging.info(f"Conversion result: {result}")
         logging.info("Task completed successfully.")
     except Exception as e:
         logging.error(f"Conversion failed: {e}")
+    finally:
+        pbar.update(1)
