@@ -10,10 +10,12 @@ from typing import Optional
 from pathlib import Path
 
 from colorlog import ColoredFormatter
+from ..config import CONFIG
 
 
-def get_logger(name: str = "root", console_level: int = logging.INFO) -> logging.Logger:
-    return ColoredLogger(console_level).get_logger(name)
+def get_logger(name: str = "root",
+               console_level: int = CONFIG.get("logging", "log_level")) -> logging.Logger:
+    return ColoredLogger(console_level=console_level).get_logger(name)
 
 
 class ColoredLogger:

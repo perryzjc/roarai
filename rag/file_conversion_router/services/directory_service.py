@@ -10,19 +10,28 @@ from rag.file_conversion_router.conversion.md_converter import MarkdownConverter
 from rag.file_conversion_router.conversion.pdf_converter import PdfConverter
 from rag.file_conversion_router.services.task_manager import schedule_conversion
 from ..utils.logger import get_logger
+from ..config import CONFIG
 
 
 ConverterMapping = Dict[str, Type[BaseConverter]]
 
-# Mapping from file extensions to their corresponding conversion classes
-_CONVERTER_MAPPING: ConverterMapping = {
-    ".pdf": PdfConverter,
-    ".md": MarkdownConverter,
-    # TODO: Add more file types and converters here
-}
+
+def get_converter_mapping(config=CONFIG) -> ConverterMapping:
+    """Generate a mapping from file extensions to their corresponding conversion classes,
+    controlling for any converters that are disabled in the configuration.
+    """
+    converters = {
+        '.pdf': PdfConverter,
+        '.md': MarkdownConverter
+    }
+    # Generate dictionary only for enabled converters
+    return {extension: converter for extension, converter in converters.items() if
+            config.getboolean('converters', f'{extension.split(".")[-1]}_converter', fallback=False)}
+
+
+_CONVERTER_MAPPING: ConverterMapping = get_converter_mapping(CONFIG)
+# Default batch size for processing files
 _BATCH_SIZE = 128
-
-
 logger = get_logger(__name__)
 
 

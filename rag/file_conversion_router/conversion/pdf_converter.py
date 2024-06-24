@@ -4,6 +4,7 @@ from pathlib import Path
 from ..utils.logger import get_logger
 from ..utils.nougat_api import NougatAPIClient, NougatServer
 from rag.file_conversion_router.conversion.base_converter import BaseConverter
+from ..config import CONFIG
 
 pdf_converter_logger = get_logger(__name__)
 
@@ -11,8 +12,15 @@ pdf_converter_logger = get_logger(__name__)
 class PdfConverter(BaseConverter):
     """A converter for converting PDF files to Markdown using the Nougat API."""
 
-    nougat_server = NougatServer()
-    nougat_api_client = NougatAPIClient()
+    nougat_server = NougatServer(
+        model_tag=CONFIG.get("pdf_converter.nougat", "model_tag"),
+        batch_size=CONFIG.getint("pdf_converter.nougat", "batch_size"),
+        port=CONFIG.getint("pdf_converter.nougat", "server_port"),
+        no_skipping=CONFIG.get("pdf_converter.nougat", "no_skipping"),
+    )
+    nougat_api_client = NougatAPIClient(
+        f'{CONFIG.getint("pdf_converter.nougat", "server_port")}'
+    )
 
     def __init__(self):
         super().__init__()
