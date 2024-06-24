@@ -10,7 +10,7 @@ from tests.utils import compare_files
 
 @pytest.mark.parametrize(
     "input_path, expected_output_paths",
-    load_test_cases_config("unit_tests", "pdf_converter"),
+    load_test_cases_config("unit_tests", "pdf_converter", "example_1"),
 )
 def test_pdf_converter_on_task_manager(input_path: str, expected_output_paths: List[str], tmp_path, pdf_converter):
     input_path = Path(input_path)

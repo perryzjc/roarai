@@ -10,8 +10,8 @@ from tests.utils import compare_folders
 @pytest.mark.parametrize(
     "input_folder, expected_output_folder",
     [
-        *load_test_cases_config("integrated_tests", "plain_folder_3_pdfs"),
-        *load_test_cases_config("integrated_tests", "nested_folder_pdf+md"),
+        *load_test_cases_config("integrated_tests", "example_1_plain_folder_3_pdfs"),
+        *load_test_cases_config("integrated_tests", "example_2_nested_folder_pdf+md"),
     ],
 )
 def test_folder_conversion(input_folder: str, expected_output_folder: str, tmp_path):
