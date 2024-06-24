@@ -4,6 +4,7 @@ import time
 import atexit
 import socket
 import subprocess
+from http import HTTPStatus
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -60,10 +61,13 @@ class NougatAPIClient:
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                response = requests.get(f"{self.api_url}/predict/")
-                if response.status_code == 405:  # Method Not Allowed
-                    nougat_logger.info("Nougat server is ready")
-                    return
+                # health check
+                response = requests.get(f"{self.api_url}/")
+                if response.status_code == HTTPStatus.OK:
+                    data = response.json()
+                    if data.get("status-code") == HTTPStatus.OK:
+                        nougat_logger.info("Nougat server is ready")
+                        return
             except RequestException:
                 pass
             time.sleep(retry_interval)
