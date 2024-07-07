@@ -43,7 +43,6 @@ class NougatAPIClient:
             nougat_logger.debug(f"Sending PDF to Nougat API: {pdf_file}")
             try:
                 response = requests.post(url, params=params, files=files, headers=headers)
-                response.raise_for_status()
                 return response.text
             except RequestException as e:
                 raise Exception(f"Error converting PDF: {e}") from e
@@ -81,7 +80,8 @@ class NougatServer:
                  model_tag: ModelTag = "0.1.0-small",
                  batch_size: int = 4,
                  port: int = 8503,
-                 no_skipping: bool = True
+                 no_skipping: bool = True,
+                 recompute: bool = False,
                  ):
         """
         Args:
@@ -95,6 +95,7 @@ class NougatServer:
         self.port = port
         self.device_type, _ = detect_gpu_setup()
         self.no_skipping = no_skipping
+        self.recompute = recompute
         self._validate_parameters()
 
         setup_info = {
@@ -103,6 +104,7 @@ class NougatServer:
             "port": self.port,
             "device_type": self.device_type,
             "no_skipping": self.no_skipping,
+            "recompute": self.recompute,
         }
         nougat_logger.info(f"Nougat server is running with the following setup: {setup_info}")
 
@@ -131,6 +133,7 @@ class NougatServer:
                 command = [
                     "nougat_api",
                     "--no-skipping" if self.no_skipping else "",
+                    "--recompute" if self.recompute else "",
                     "--model", self.model_tag,
                     "--batchsize", str(self.batch_size),
                     "--port", str(self.port),
