@@ -13,34 +13,38 @@ pdf_converter_logger = get_logger(__name__)
 class PdfConverter(BaseConverter):
     """A converter for converting PDF files to Markdown using the Nougat API."""
 
-    USE_NOUGAT_SERVER = CONFIG.getboolean("pdf_converter.nougat", "use_nougat_server")
-    if USE_NOUGAT_SERVER:
-        nougat_server = NougatServer(
-            model_tag=CONFIG.get("pdf_converter.nougat", "model_tag"),
-            batch_size=CONFIG.getint("pdf_converter.nougat", "batch_size"),
-            port=CONFIG.getint("pdf_converter.nougat", "server_port"),
-            no_skipping=CONFIG.get("pdf_converter.nougat", "no_skipping"),
-        )
-        nougat_api_client = NougatAPIClient(
-            f'{CONFIG.getint("pdf_converter.nougat", "server_port")}'
-        )
-        nougat_server.start_server()
-        nougat_api_client.wait_for_server_ready()
-    else:
-        model_tag = CONFIG.get("pdf_converter.nougat", "model_tag")
-        batch_size = CONFIG.getint("pdf_converter.nougat", "batch_size")
+    def __init__(self):
+        super().__init__()
+        self.use_nougat_server = CONFIG.getboolean("pdf_converter.nougat", "use_nougat_server")
+        self.no_skip = CONFIG.getboolean("pdf_converter.nougat", "no_skipping")
+        self.batch_size = CONFIG.getint("pdf_converter.nougat", "batch_size")
+        self.model_tag = CONFIG.get("pdf_converter.nougat", "model_tag")
+        self.recompute = CONFIG.getboolean("pdf_converter.nougat", "recompute")
+
+        if self.use_nougat_server:
+            self.nougat_server = NougatServer(
+                model_tag=self.model_tag,
+                batch_size=self.batch_size,
+                port=CONFIG.getint("pdf_converter.nougat", "server_port"),
+                no_skipping=self.no_skip,
+            )
+            self.nougat_api_client = NougatAPIClient(
+                f'{CONFIG.getint("pdf_converter.nougat", "server_port")}'
+            )
+            self.nougat_server.start_server()
+            self.nougat_api_client.wait_for_server_ready()
 
     def _to_markdown(self, input_path: Path, output_path: Path) -> None:
-        if self.USE_NOUGAT_SERVER:
+        if self.use_nougat_server:
             self._convert_using_nougat_server(input_path, output_path)
         else:
             self._convert_using_nougat_cli(input_path, output_path)
 
-    @classmethod
-    def _convert_using_nougat_server(cls, input_path: Path, output_path: Path) -> None:
+    def _convert_using_nougat_server(self, input_path: Path, output_path: Path) -> None:
+        pdf_converter_logger.info(f"Converting PDF file using Nougat Server.")
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            markdown_text = cls.nougat_api_client.convert_pdf(input_path)
+            markdown_text = self.nougat_api_client.convert_pdf(input_path)
             markdown_text = markdown_text.strip('"').replace('\\n', '\n')
             with open(output_path, "w") as file:
                 file.write(markdown_text)
@@ -48,20 +52,21 @@ class PdfConverter(BaseConverter):
             pdf_converter_logger.error(f"An error occurred: {str(e)}")
             raise
 
-    @classmethod
-    def _convert_using_nougat_cli(cls, input_path: Path, output_path: Path) -> None:
+    def _convert_using_nougat_cli(self, input_path: Path, output_path: Path) -> None:
         command = [
             "nougat",
             str(input_path),
             "-o",
             str(output_path.parent),
-            "--no-skipping",
-            # "--recompute",
+            "--no-skipping" if self.no_skip else "",
+            "--recompute" if self.recompute else "",
             "--model",
-            cls.model_tag,
+            self.model_tag,
             "--batchsize",
-            str(cls.batch_size),
+            str(self.batch_size),
         ]
+        command = [arg for arg in command if arg]
+        pdf_converter_logger.info(f"Converting PDF file using Nougat CLI. Command used: {command}")
         try:
             result = subprocess.run(command, check=False, capture_output=True, text=True)
             pdf_converter_logger.info(f"Output: {result.stdout}")

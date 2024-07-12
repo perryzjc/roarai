@@ -7,6 +7,14 @@
 
 
 unit_tests:
+#  Example Format for unit_tests. Not actual test cases.
+  example_format:
+    - input_path: unit_tests/example_format/input/example_input.md
+      expected_output_paths:
+        - unit_tests/example_format/expected_output/example_input.md
+        - unit_tests/example_format/expected_output/example_input.md.pkl
+        - unit_tests/example_format/expected_output/example_input.tree.txt
+
   pdf_converter:
     example_1:
       - input_path: unit_tests/pdf/example1/input/61a-sp24-mt2_sol_2_pages.pdf
