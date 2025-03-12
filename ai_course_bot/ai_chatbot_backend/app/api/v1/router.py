@@ -27,9 +27,8 @@ router.include_router(
     tags=["files"]
 )
 
-# TODO: Implement summarization
-# router.include_router(
-#     summarization.router,
-#     prefix="/summarization",
-#     tags=["summarization"]
-# )
+router.include_router(
+    summarization.router,
+    prefix="/summarization",
+    tags=["summarization"]
+)
