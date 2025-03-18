@@ -54,7 +54,7 @@ def generate_text_in_thread(messages: List[Message], streamer_iterator: Any, pip
             pipeline(prompt, max_new_tokens=1000, do_sample=True)
 
 
-def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, threshold: float, rag: bool
+def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, threshold: float, rag: bool,top_k: int = 7
                            ) -> Tuple[str, List[str], str]:
     """
     Build an augmented prompt by retrieving reference documents.
@@ -72,7 +72,7 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
     query_embed = embedding_model.encode(
         user_message, return_dense=True, return_sparse=True, return_colbert_vecs=True
     )
-    top_ids, top_docs, top_urls, similarity_scores = _get_reference_documents(query_embed, current_dir, picklefile)
+    top_ids, top_docs, top_urls, similarity_scores = _get_reference_documents(query_embed, current_dir, picklefile,top_k=7)
 
     insert_document = ""
     reference_list: List[str] = []
@@ -87,20 +87,18 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
             if top_urls[i]:
                 insert_document += (
                     f"\"\"\"Reference Number: {n}\n"
-                    f"Reference Info Path: {top_ids[i]}\n"
-                    f"Reference_Url: {top_urls[i]}\n"
+                    f"Reference Info Path(not URL): {cleaned}\n"
                     f"Document: {top_docs[i]}\"\"\"\n\n"
                 )
                 reference_string += (
                     f"Reference {n}: <|begin_of_reference_name|>{cleaned}"
-                    f"<|end_of_reference_name|><|begin_of_reference_link|>{top_urls[i]}"
+                    f"<|end_of_reference_name|><|begin_of_reference_link|>{cleaned}"
                     f"<|end_of_reference_link|>\n\n"
                 )
             else:
                 insert_document += (
                     f"\"\"\"Reference Number: {n}\n"
-                    f"Reference Info Path: {cleaned}\n"
-                    f"Reference_Url: NONE\n"
+                    f"Reference Info Path(not URL): {cleaned}\n"
                     f"Document: {top_docs[i]}\"\"\"\n\n"
                 )
                 reference_string += (
@@ -174,7 +172,8 @@ def generate_chat_response(
         rag: bool = True,
         course: Optional[str] = None,
         embedding_dir: str = "/home/bot/localgpt/tai/ai_course_bot/ai-chatbot-backend/app/embedding/",
-        threshold: float = 0.45,
+        threshold: float = 0.38,
+        top_k: int = 7,
         pipeline: Any = None
 ) -> Tuple[Any, str]:
     """
@@ -183,7 +182,7 @@ def generate_chat_response(
     """
     user_message = messages[-1].content
     modified_message, _, reference_string = build_augmented_prompt(
-        user_message, course if course else "", embedding_dir, threshold, rag
+        user_message, course if course else "", embedding_dir, threshold, rag, top_k
     )
     messages[-1].content = modified_message
     if is_local_pipeline(pipeline):
@@ -203,7 +202,8 @@ def rag_json_stream_generator(
         course: Optional[str] = None,
         # TODO: Revise the default embedding_dir path. And put it into the environment variable for best practice.
         embedding_dir: str = "/home/bot/localgpt/tai/ai_course_bot/ai-chatbot-backend/app/embedding/",
-        threshold: float = 0.45,
+        threshold: float = 0.38,
+        top_k: int = 7,
         pipeline: Any = None
 ) -> Generator[str, None, None]:
     """
@@ -211,7 +211,7 @@ def rag_json_stream_generator(
     """
     user_message = messages[-1].content
     modified_message, reference_list, reference_string = build_augmented_prompt(
-        user_message, course if course else "", embedding_dir, threshold, rag
+        user_message, course if course else "", embedding_dir, threshold, rag, top_k
     )
     messages[-1].content = modified_message
     if is_local_pipeline(pipeline):
