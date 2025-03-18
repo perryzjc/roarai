@@ -79,7 +79,7 @@ def clean_path(url_path: str) -> str:
     return ' '.join(cleaned.split())
 
 
-def _get_references_from_sql(query_embed: Dict[str, Any], current_dir: str, picklefile: str
+def _get_references_from_sql(query_embed: Dict[str, Any], current_dir: str, picklefile: str, top_k: int
                              ) -> Tuple[List[str], List[str], List[str], List[float]]:
     """
     Retrieve top reference documents from a SQL database.
@@ -96,7 +96,7 @@ def _get_references_from_sql(query_embed: Dict[str, Any], current_dir: str, pick
             SELECT rowid, distance
             FROM embeddings
             WHERE vss_search(embedding, ?)
-            LIMIT 3;
+            LIMIT top_k;
         """, (query_vector_json,))
     results = cur.fetchall()
     db.commit()
@@ -122,7 +122,7 @@ def _get_references_from_sql(query_embed: Dict[str, Any], current_dir: str, pick
     return top_ids, top_docs, top_urls, similarity_scores
 
 
-def _get_references_from_pickle(query_embed: Dict[str, Any], current_dir: str, picklefile: str
+def _get_references_from_pickle(query_embed: Dict[str, Any], current_dir: str, picklefile: str, top_k: int
                                 ) -> Tuple[List[str], List[str], List[str], List[float]]:
     """
     Retrieve top reference documents from a pickle file.
@@ -138,22 +138,22 @@ def _get_references_from_pickle(query_embed: Dict[str, Any], current_dir: str, p
     combined_scores = bge_compute_score(query_embed, embedding_list, [1, 1, 1], None, None)
     score_array = np.array(combined_scores['colbert+sparse+dense'])
     indices = np.argsort(score_array)[::-1]
-    similarity_scores = np.sort(score_array)[-3:][::-1]
-    top_ids = id_list[indices][:3]
-    top_docs = doc_list[indices][:3]
-    top_urls = url_list[indices][:3].tolist()
+    similarity_scores = np.sort(score_array)[-top_k:][::-1]
+    top_ids = id_list[indices][:top_k]
+    top_docs = doc_list[indices][:top_k]
+    top_urls = url_list[indices][:top_k].tolist()
     return top_ids, top_docs, top_urls, similarity_scores
 
 
-def _get_reference_documents(query_embed: Dict[str, Any], current_dir: str, picklefile: str
+def _get_reference_documents(query_embed: Dict[str, Any], current_dir: str, picklefile: str,top_k: int
                              ) -> Tuple[List[str], List[str], List[str], List[float]]:
     """
     Retrieve top reference documents based on the query embedding.
     """
     if SQLDB:
-        return _get_references_from_sql(query_embed, current_dir, picklefile)
+        return _get_references_from_sql(query_embed, current_dir, picklefile, top_k=top_k)
     else:
-        return _get_references_from_pickle(query_embed, current_dir, picklefile)
+        return _get_references_from_pickle(query_embed, current_dir, picklefile, top_k=top_k)
 
 
 def _get_pickle_and_class(course: str) -> Tuple[str, str]:
@@ -165,9 +165,11 @@ def _get_pickle_and_class(course: str) -> Tuple[str, str]:
     elif course == "CS 61A":
         return "cs61a.pkl", "Structure and Interpretation of Computer Programs"
     elif course == "CS 294-137":
-        return "cs294.pkl", "Immersive Computing and Virtual Reality"
+        return "cs294_old.pkl", "Immersive Computing and Virtual Reality"
     elif course == "Econ 140":
         return "Econ140.pkl", "Econometrics"
+    elif course == "Multilingual Engagement":
+        return "language.pkl", "Multilingual Engagement"
     else:
         return "Berkeley.pkl", "Berkeley"
 
