@@ -64,6 +64,8 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
       - reference_string: formatted string for plain text references.
     TODO: reference_string can be removed in the future once the legacy code migration is completed.
     """
+    print("\nUser Question: \n", user_message, "\n")
+
     if not rag:
         return user_message, [], ""
 
@@ -72,44 +74,49 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
     query_embed = embedding_model.encode(
         user_message, return_dense=True, return_sparse=True, return_colbert_vecs=True
     )
-    top_ids, top_docs, top_urls, similarity_scores = _get_reference_documents(query_embed, current_dir, picklefile,top_k=7)
+    top_ids, top_docs, top_urls, similarity_scores,top_files,top_topic_paths = _get_reference_documents(query_embed, current_dir, picklefile,top_k=7)
 
     insert_document = ""
     reference_list: List[str] = []
     reference_string = ""
     n = 0
-
+    print(top_ids)
+    print(similarity_scores)
     for i in range(len(top_docs)):
         reference_list.append(top_urls[i] if top_urls[i] else "")
         if similarity_scores[i] > threshold:
             n += 1
-            cleaned = clean_path(top_ids[i])
+            cleaned_info_path = top_ids[i]
+            cleaned_file_path = top_files[i]
+            cleaned_topic_path = top_topic_paths[i]
             if top_urls[i]:
                 insert_document += (
                     f"\"\"\"Reference Number: {n}\n"
-                    f"Reference Info Path(not URL): {cleaned}\n"
+                    f"Directory Path to file: {cleaned_file_path}\n"
+                    f"Topic Path of chunk in file: {cleaned_topic_path}\n"
                     f"Document: {top_docs[i]}\"\"\"\n\n"
                 )
                 reference_string += (
-                    f"Reference {n}: <|begin_of_reference_name|>{cleaned}"
-                    f"<|end_of_reference_name|><|begin_of_reference_link|>{cleaned}"
+                    f"Reference {n}: <|begin_of_reference_name|>{cleaned_info_path}"
+                    f"<|end_of_reference_name|><|begin_of_reference_link|>{top_urls[i]}"
                     f"<|end_of_reference_link|>\n\n"
                 )
             else:
                 insert_document += (
                     f"\"\"\"Reference Number: {n}\n"
-                    f"Reference Info Path(not URL): {cleaned}\n"
+                    f"Directory Path to file: {cleaned_file_path}\n"
+                    f"Topic Path of chunk in file: {cleaned_topic_path}\n"
                     f"Document: {top_docs[i]}\"\"\"\n\n"
                 )
                 reference_string += (
-                    f"Reference {n}: <|begin_of_reference_name|>{cleaned}"
+                    f"Reference {n}: <|begin_of_reference_name|>{cleaned_info_path}"
                     f"<|end_of_reference_name|><|begin_of_reference_link|>"
                     f"<|end_of_reference_link|>\n\n"
                 )
 
     if not insert_document or n == 0:
         modified_message = (
-            f"Answer the instruction. If unsure of the answer, explain that there is no data in the knowledge base "
+            f"Answer the instruction thoroughly with a well structured markdown format answer. If unsure of the answer, explain that there is no data in the knowledge base "
             f"for the response and refuse to answer. If the instruction is not related to class topic {class_name}, "
             f"explain and refuse to answer.\n---\n"
             f"Instruction: {user_message}"
@@ -117,12 +124,13 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
     else:
         insert_document += f"Instruction: {user_message}"
         modified_message = (
-            f"Understand the reference documents and use related ones to answer the instruction thoroughly. "
-            f"Keep your answer grounded in the facts of the references that are relevant and refer to specific "
-            f"reference number inline. Do not provide any reference at the end. "
+            f"Understand the reference documents and pick the helpful ones to answer the instruction thoroughly with a well structured markdown format answer. "
+            f"Keep your answer grounded in the facts of the references that are relevant."
+            f"Remember to refer to specific reference number inline with md *bold style*.Remember to refer to specific reference number inline with md *bold style*. Remember to refer to specific reference number inline with md *bold style*.Do not list reference at the end. Do not explain if the reference is not related to the question."
             f"If the instruction is not related to class topic {class_name}, explain and refuse to answer.\n"
             f"---\n{insert_document}"
         )
+    print("\nAugmented Prompt: \n", modified_message, "\n")
     return modified_message, reference_list, reference_string
 
 
@@ -166,13 +174,14 @@ def format_chat_msg(messages: List[Message]) -> List[Message]:
     return response
 
 
+
 def generate_chat_response(
         messages: List[Message],
         stream: bool = True,
         rag: bool = True,
         course: Optional[str] = None,
         embedding_dir: str = "/home/bot/localgpt/tai/ai_course_bot/ai-chatbot-backend/app/embedding/",
-        threshold: float = 0.38,
+        threshold: float = 0.32,
         top_k: int = 7,
         pipeline: Any = None
 ) -> Tuple[Any, str]:
@@ -184,6 +193,7 @@ def generate_chat_response(
     modified_message, _, reference_string = build_augmented_prompt(
         user_message, course if course else "", embedding_dir, threshold, rag, top_k
     )
+
     messages[-1].content = modified_message
     if is_local_pipeline(pipeline):
         streamer_iterator = transformers.TextIteratorStreamer(pipeline.tokenizer, skip_prompt=True)

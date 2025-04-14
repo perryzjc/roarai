@@ -214,6 +214,7 @@ def perform_rag(messages: List[Message], course: str) -> Any:
         "CS 61A": ["cs61a.pkl", "Structure and Interpretation of Computer Programs"],
         "CS 294-137": ["cs294.pkl", "Immersive Computing and Virtual Reality using Unity"],
         "Econ 140": ["Econ140.pkl", "Econometrics"],
+        "ROAR Academy": ["roar_academy.pkl", "ROAR Academy"],
         "Multilingual Engagement": ["language.pkl", "Multilingual_Engagement"],
         "Default": ["Berkeley.pkl", "Berkeley"]
     }
