@@ -175,7 +175,7 @@ def _get_pickle_and_class(course: str) -> Tuple[str, str]:
     elif course == "INTD 315":
         return "language.pkl", "Multilingual Engagement"
     elif course == "ROAR Academy":
-        return "roar_academy.pkl", "learning python from scratch to autonomous driving"
+        return "roar_academy.pkl", "learning python and autonomous driving"
     else:
         return "Berkeley.pkl", "Berkeley"
 def top_k_selector(message: str, stream: bool = True, rag: bool = True, course: Optional[str] = None, k: int = 3

@@ -117,7 +117,7 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
     if not insert_document or n == 0:
         modified_message = (
             f"Answer the instruction thoroughly with a well structured markdown format answer. If unsure of the answer, explain that there is no data in the knowledge base "
-            f"for the response and refuse to answer. If the instruction is not related to class topic {class_name}, "
+            f"for the response and refuse to answer. If the instruction is not related to any topic related to {class_name}, "
             f"explain and refuse to answer.\n---\n"
             f"Instruction: {user_message}"
         )
@@ -127,7 +127,7 @@ def build_augmented_prompt(user_message: str, course: str, embedding_dir: str, t
             f"Understand the reference documents and pick the helpful ones to answer the instruction thoroughly with a well structured markdown format answer. "
             f"Keep your answer grounded in the facts of the references that are relevant."
             f"Remember to refer to specific reference number inline with md *bold style*.Remember to refer to specific reference number inline with md *bold style*. Remember to refer to specific reference number inline with md *bold style*.Do not list reference at the end. Do not explain if the reference is not related to the question."
-            f"If the instruction is not related to class topic {class_name}, explain and refuse to answer.\n"
+            f"If the instruction is not related to any topic related to {class_name}, explain and refuse to answer.\n"
             f"---\n{insert_document}"
         )
     print("\nAugmented Prompt: \n", modified_message, "\n")
