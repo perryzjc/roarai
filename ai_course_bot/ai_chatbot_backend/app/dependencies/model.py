@@ -10,12 +10,13 @@ from ..config import settings
 def get_local_model_pipeline():
     """Loads the local text generation model for inference.
     """
-    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    # model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    model_id = "THUDM/GLM-4-9B-0414"
     device = 0 if torch.cuda.is_available() else -1
     pipeline = transformers.pipeline(
         "text-generation",
         model=model_id,
-        model_kwargs={"torch_dtype": torch.bfloat16},
+        model_kwargs={"torch_dtype": 'auto'},
         device=device
     )
     return pipeline

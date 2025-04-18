@@ -33,19 +33,19 @@ def generate_text_in_thread(messages: List[Message], streamer_iterator: Any, pip
     """
     with pipeline_generation_lock:
         if is_local_pipeline(pipeline):
-            terminators = [
-                pipeline.tokenizer.eos_token_id,
-                pipeline.tokenizer.convert_tokens_to_ids("<|eot_id|>")
-            ]
+            # terminators = [
+            #     pipeline.tokenizer.eos_token_id,
+            #     pipeline.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+            # ]
+            msg=[{"role": message.role, "content": message.content} for message in messages]
             prompt = pipeline.tokenizer.apply_chat_template(
-                messages,
+                msg,
                 tokenize=False,
                 add_generation_prompt=True
             )
             pipeline(
                 prompt,
-                max_new_tokens=1000,
-                eos_token_id=terminators,
+                max_new_tokens=1024,
                 do_sample=True,
                 streamer=streamer_iterator
             )
@@ -140,7 +140,7 @@ def local_parser(stream: Any, reference_string: str) -> Generator[str, None, Non
     TODO: This function can be removed in the future once the legacy code migration is completed.
     """
     for chunk in stream:
-        result = chunk.replace("<|eot_id|>", "")
+        result = chunk.replace("---<|user|>", "")
         yield result if result is not None else ""
         print(result, end="")
     ref_block = f'\n\n<|begin_of_reference|>\n\n{reference_string}<|end_of_reference|>'
